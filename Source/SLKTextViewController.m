@@ -417,8 +417,12 @@ CGFloat const SLKAutoCompletionViewDefaultHeight = 140.0;
 {
     // A bottom margin is required only if the view is extended out of it bounds
     if ((self.edgesForExtendedLayout & UIRectEdgeBottom) > 0) {
-        if (self.tabBarController) {
-            return CGRectGetHeight(self.tabBarController.tabBar.frame);
+        
+        UITabBar *tabBar = self.tabBarController.tabBar;
+        
+        // Considers the bottom tab bar, unless it will be hidden
+        if (tabBar && !tabBar.hidden && !self.hidesBottomBarWhenPushed) {
+            return CGRectGetHeight(tabBar.frame);
         }
     }
     
@@ -565,6 +569,12 @@ CGFloat const SLKAutoCompletionViewDefaultHeight = 140.0;
     // Skips if trying to update the same status
     if (_keyboardStatus == status) {
         return NO;
+    }
+    
+    // Forces the keyboard status when didHide to avoid any inconsistency.
+    if (status == SLKKeyboardStatusDidHide) {
+        _keyboardStatus = status;
+        return YES;
     }
     
     // Skips illogical conditions
@@ -1848,14 +1858,24 @@ CGFloat const SLKAutoCompletionViewDefaultHeight = 140.0;
     }
     
     // Detects double spacebar tapping, to replace the default "." insert with a formatting symbol, if needed.
-    if (textView.autoCompleteFormatting && range.location > 0 && [text length] > 0 &&
+    if (textView.isFormattingEnabled && range.location > 0 && text.length > 0 &&
         [[NSCharacterSet whitespaceCharacterSet] characterIsMember:[text characterAtIndex:0]] &&
         [[NSCharacterSet whitespaceCharacterSet] characterIsMember:[textView.text characterAtIndex:range.location - 1]]) {
         
         BOOL shouldChange = YES;
         
+        // Since we are moving 2 characters to the left, we need for to make sure that the string's lenght,
+        // before the caret position, is higher than 2.
+        if ([textView.text substringToIndex:textView.selectedRange.location].length < 2) {
+            return YES;
+        }
+        
         NSRange wordRange = range;
         wordRange.location -= 2; // minus the white space added with the double space bar tapping
+        
+        if (wordRange.location == NSNotFound) {
+            return YES;
+        }
         
         NSArray *symbols = textView.registeredSymbols;
         
@@ -2094,6 +2114,7 @@ CGFloat const SLKAutoCompletionViewDefaultHeight = 140.0;
 
 #pragma mark - UIAlertViewDelegate Methods
 
+#ifndef __IPHONE_8_0
 - (void)alertView:(UIAlertView *)alertView clickedButtonAtIndex:(NSInteger)buttonIndex
 {
     if (alertView.tag != kSLKAlertViewClearTextTag || buttonIndex == [alertView cancelButtonIndex] ) {
@@ -2105,6 +2126,7 @@ CGFloat const SLKAutoCompletionViewDefaultHeight = 140.0;
         [self.textView slk_clearText:NO];
     }
 }
+#endif
 
 
 #pragma mark - View Auto-Layout
